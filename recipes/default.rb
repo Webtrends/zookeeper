@@ -2,7 +2,7 @@
 # Cookbook Name:: zookeeper
 # Recipe:: default
 # Author:: sean.mcnamara@webtrends.com
-# Author:: tim.smith@llnw.com
+# Author:: tsmith@llnw.com
 # Author:: david.dvorak@webtrends.com
 #
 # Copyright 2013, Webtrends, Inc.

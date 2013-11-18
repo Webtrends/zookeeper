@@ -2,7 +2,7 @@
 # Cookbook Name:: zookeeper
 # Recipe:: default
 # Author:: sean.mcnamara@webtrends.com
-# Author:: tim.smith@webtrends.com
+# Author:: tim.smith@llnw.com
 # Author:: david.dvorak@webtrends.com
 #
 # Copyright 2013, Webtrends, Inc.
@@ -29,149 +29,141 @@ node.save # needed to populate attributes
 
 # get servers in this cluster
 zookeeper_nodes = zookeeper_search('zookeeper').sort
-raise Chef::Exceptions::RoleNotFound, "zookeeper role not found" if zookeeper_nodes.count == 0
-
-
-
+fail Chef::Exceptions::RoleNotFound, 'zookeeper role not found' if zookeeper_nodes.count == 0
 
 ###########################################################################
 # This block facilitates moving from zookeeper 3.3.6 to 3.4.5.  At some
 # point in the future we can remove this (ie- when all our environments)
 # are off the older versions of this cookbook.
 
-file "/etc/cron.hourly/zkRollSnapshot" do
+file '/etc/cron.hourly/zkRollSnapshot' do
   action :delete
 end
 
-
 ###########################################################################
-
-
-
-
 
 # setup zookeeper group
 group 'zookeeper'
 
 # setup zookeeper user
 user 'zookeeper' do
-	comment 'ZooKeeper user'
-	gid 'zookeeper'
-	home '/home/zookeeper'
-	shell '/bin/false'
+  comment 'ZooKeeper user'
+  gid 'zookeeper'
+  home '/home/zookeeper'
+  shell '/bin/false'
 end
 
 # create the install, data, data-log, and log directories
-[ node.zookeeper_attrib(:install_dir), node.zookeeper_attrib(:data_dir), node.zookeeper_attrib(:data_log_dir), node.zookeeper_attrib(:log_dir)].each do |dir|
-	directory dir do
-		owner 'zookeeper'
-		group 'zookeeper'
-		recursive true
-		mode 00755
-	end
+[node.zookeeper_attrib(:install_dir), node.zookeeper_attrib(:data_dir), node.zookeeper_attrib(:data_log_dir), node.zookeeper_attrib(:log_dir)].each do |dir|
+  directory dir do
+    owner 'zookeeper'
+    group 'zookeeper'
+    recursive true
+    mode 00755
+  end
 
-	# force ownership change in case these directories were created by other means
-	execute dir do
-		command "chown -R zookeeper:zookeeper #{dir}"
-		action :run
-	end
+  # force ownership change in case these directories were created by other means
+  execute dir do
+    command "chown -R zookeeper:zookeeper #{dir}"
+    action :run
+  end
 end
 
 # download zookeeper
 remote_file source_fullpath do
-	source node.zookeeper_attrib(:download_url)
-	owner 'zookeeper'
-	group 'zookeeper'
-	mode 00755
-	action :create_if_missing
-	notifies :run, "execute[extract-zookeeper]", :immediately
+  source node.zookeeper_attrib(:download_url)
+  owner 'zookeeper'
+  group 'zookeeper'
+  mode 00755
+  action :create_if_missing
+  notifies :run, 'execute[extract-zookeeper]', :immediately
 end
 
 # extract it
 execute 'extract-zookeeper' do
-	command "tar -zxf #{source_fullpath}"
-	creates "#{node.zookeeper_attrib(:install_dir)}/zookeeper-#{node.zookeeper_attrib(:version)}"
-	cwd node.zookeeper_attrib(:install_dir)
-	user 'zookeeper'
-	group 'zookeeper'
-	action :nothing
+  command "tar -zxf #{source_fullpath}"
+  creates "#{node.zookeeper_attrib(:install_dir)}/zookeeper-#{node.zookeeper_attrib(:version)}"
+  cwd node.zookeeper_attrib(:install_dir)
+  user 'zookeeper'
+  group 'zookeeper'
+  action :nothing
 end
 
 # create a link from the specific version to a generic zookeeper folder
 link "#{node.zookeeper_attrib(:install_dir)}/current" do
-	owner 'zookeeper'
-	group 'zookeeper'
-	to "#{node.zookeeper_attrib(:install_dir)}/zookeeper-#{node.zookeeper_attrib(:version)}"
+  owner 'zookeeper'
+  group 'zookeeper'
+  to "#{node.zookeeper_attrib(:install_dir)}/zookeeper-#{node.zookeeper_attrib(:version)}"
 end
 
 # manage configs
 %w[configuration.xsl java.env log4j.properties zoo.cfg].each do |template_file|
-	template "#{node.zookeeper_attrib(:config_dir)}/#{template_file}" do
-		source "#{template_file}.erb"
-		owner 'zookeeper'
-		group 'zookeeper'
-		mode 00644
-		variables({
-			:quorum           => zookeeper_nodes,				
-			:tick_time        => node.zookeeper_attrib(:tick_time),
-			:init_limit       => node.zookeeper_attrib(:init_limit),
-			:sync_limit       => node.zookeeper_attrib(:sync_limit),
-			:data_dir         => node.zookeeper_attrib(:data_dir),
-			:client_port      => node.zookeeper_attrib(:client_port),
-			:max_client_cnxns => node.zookeeper_attrib(:max_client_cnxns),
-			:data_log_dir     => node.zookeeper_attrib(:data_log_dir),
-			:snapshot_num     => node.zookeeper_attrib(:snapshot_num),
-			:purge_interval   => node.zookeeper_attrib(:purge_interval),
-			:max_session_timeout => node.zookeeper_attrib(:max_session_timeout)
-		})
-	end
+  template "#{node.zookeeper_attrib(:config_dir)}/#{template_file}" do
+    source "#{template_file}.erb"
+    owner 'zookeeper'
+    group 'zookeeper'
+    mode 00644
+    variables(
+      :quorum           => zookeeper_nodes,
+      :tick_time        => node.zookeeper_attrib(:tick_time),
+      :init_limit       => node.zookeeper_attrib(:init_limit),
+      :sync_limit       => node.zookeeper_attrib(:sync_limit),
+      :data_dir         => node.zookeeper_attrib(:data_dir),
+      :client_port      => node.zookeeper_attrib(:client_port),
+      :max_client_cnxns => node.zookeeper_attrib(:max_client_cnxns),
+      :data_log_dir     => node.zookeeper_attrib(:data_log_dir),
+      :snapshot_num     => node.zookeeper_attrib(:snapshot_num),
+      :purge_interval   => node.zookeeper_attrib(:purge_interval),
+      :max_session_timeout => node.zookeeper_attrib(:max_session_timeout)
+    )
+  end
 end
 
 file "#{node.zookeeper_attrib(:data_dir)}/myid" do
-	owner 'zookeeper'
-	group 'zookeeper'
-	mode 00644
-	content (zookeeper_nodes.index(node[:fqdn]) + 1).to_s
+  owner 'zookeeper'
+  group 'zookeeper'
+  mode 00644
+  content (zookeeper_nodes.index(node[:fqdn]) + 1).to_s
 end
 
 # configure start script (the true startup script is in /etc/service)
 template "#{node.zookeeper_attrib(:install_dir)}/current/bin/zkServer.sh" do
-	source 'zkServer.sh.erb'
-	mode 00755
-	owner 'zookeeper'
-	group 'zookeeper'
-	variables({
-		:java_jmx_port    => node.zookeeper_attrib(:jmx_port),
-	})
+  source 'zkServer.sh.erb'
+  mode 00755
+  owner 'zookeeper'
+  group 'zookeeper'
+  variables({
+    :java_jmx_port    => node.zookeeper_attrib(:jmx_port),
+  })
 end
 
 # stop zookeeper if setting up runit service for the first time
 execute 'zookeeper-manual-stop' do
-	command "#{node.zookeeper_attrib(:install_dir)}/current/bin/zkServer.sh stop"
-	not_if { File.exists?("#{node[:runit][:sv_dir]}/zookeeper") }
+  command "#{node.zookeeper_attrib(:install_dir)}/current/bin/zkServer.sh stop"
+  not_if { File.exists?("#{node[:runit][:sv_dir]}/zookeeper") }
 end
 
 # setup service
 runit_service 'zookeeper' do
-	options({
-		:java_jmx_port => node.zookeeper_attrib(:jmx_port)
-	})
+  options(
+    :java_jmx_port => node.zookeeper_attrib(:jmx_port)
+  )
 end
 
 service 'zookeeper' do
-	subscribes :restart, resources(
-		:template => "#{node.zookeeper_attrib(:config_dir)}/zoo.cfg",
-		:link     => "#{node.zookeeper_attrib(:install_dir)}/current"
-	)
+  subscribes :restart, resources(
+    :template => "#{node.zookeeper_attrib(:config_dir)}/zoo.cfg",
+    :link     => "#{node.zookeeper_attrib(:install_dir)}/current"
+  )
 end
 
 # create collectd plugin for zookeeper if collectd has been applied.
 if node.attribute?('collectd')
-	template "#{node['collectd']['plugin_conf_dir']}/collectd_zookeeper.conf" do
-		source "collectd_zookeeper.conf.erb"
-		owner 'root'
-		group 'root'
-		mode 00644
-		notifies :restart, resources(:service => 'collectd')
-	end
+  template "#{node['collectd']['plugin_conf_dir']}/collectd_zookeeper.conf" do
+    source 'collectd_zookeeper.conf.erb'
+    owner 'root'
+    group 'root'
+    mode 00644
+    notifies :restart, resources(:service => 'collectd')
+  end
 end
